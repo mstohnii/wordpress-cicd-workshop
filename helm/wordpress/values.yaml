@@ -1,0 +1,42 @@
+namespace: wordpress
+
+wordpress:
+  image:
+    repository: techiescamp/wordpress-nginx
+    tag: "7.0.0"
+  replicas: 1
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30004
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "200m"
+  pvc:
+    storage: 2Gi
+
+mysql:
+  image:
+    repository: mysql
+    tag: latest
+  replicas: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "200m"
+  storage: 2Gi
+
+secret:
+  # Base64 decoded values from original secret.yaml
+  adminPassword: "admin@123"
+  username: "crun chops"
+  password: "crun chops@123"
+  dbName: "wordpress_db"
+
