@@ -63,3 +63,4 @@ kubectl get pods -n wordpress
 kubectl get svc -n wordpress
 ```
 
+helm upgrade --install wordpress ./helm/wordpress --namespace wordpress --create-namespace --wait
