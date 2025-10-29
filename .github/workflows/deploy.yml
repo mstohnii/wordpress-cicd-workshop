@@ -22,7 +22,7 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v4
         with:
-          version: '3.19.0'
+          version: 'latest'
 
       - name: Azure Login
         uses: azure/login@v2
@@ -41,20 +41,25 @@ jobs:
             --name ${{ secrets.AKS_CLUSTER_NAME }} \
             --overwrite-existing
 
-      - name: Create namespace if not exists
+      - name: Deploy inline (Helm)
         run: |
-          kubectl create namespace wordpress --dry-run=client -o yaml | kubectl apply -f -
+          set -euo pipefail
+          NAMESPACE=${NAMESPACE:-wordpress}
+          RELEASE_NAME=${RELEASE_NAME:-wordpress}
+          CHART_PATH=${CHART_PATH:-./helm/wordpress}
+          TIMEOUT=${TIMEOUT:-10m}
 
-      - name: Deploy with Helm
-        run: |
-          helm upgrade --install wordpress ./helm/wordpress \
-            --namespace wordpress \
+          echo "Creating namespace if needed: ${NAMESPACE}"
+          kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "Deploying Helm release '${RELEASE_NAME}'"
+          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
+            --namespace "${NAMESPACE}" \
             --create-namespace \
             --wait \
-            --timeout 10m
+            --timeout "${TIMEOUT}"
 
-      - name: Verify deployment
-        run: |
-          kubectl get pods -n wordpress
-          kubectl get svc -n wordpress
+          echo "Objects in namespace: ${NAMESPACE}"
+          kubectl get all -n "${NAMESPACE}"
+          kubectl get svc -n "${NAMESPACE}"
 
