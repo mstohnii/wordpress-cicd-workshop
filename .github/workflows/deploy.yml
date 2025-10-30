@@ -53,3 +53,4 @@ jobs:
           helm upgrade --install wordpress ./helm/wordpress \
             --namespace wordpress \
             --create-namespace
+            
