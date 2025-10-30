@@ -14,52 +14,42 @@ env:
 
 jobs:
   deploy:
+    name: Deploy to AKS via HELM
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: '3.19.0'
-
-      - name: Azure Login
+      - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: max
+          cluster-name: max-demo
 
-      - name: Get AKS credentials
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Prepare namespace for Helm ownership
         run: |
-          az aks get-credentials \
-            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
-            --name ${{ secrets.AKS_CLUSTER_NAME }} \
-            --overwrite-existing
-
+          kubectl get ns wordpress >/dev/null 2>&1 || kubectl create ns wordpress
+          kubectl label ns wordpress app.kubernetes.io/managed-by=Helm --overwrite
+          kubectl annotate ns wordpress meta.helm.sh/release-name=wordpress --overwrite
+          kubectl annotate ns wordpress meta.helm.sh/release-namespace=wordpress --overwrite
+            
       - name: Deploy inline (Helm)
         run: |
-          set -euo pipefail
-          NAMESPACE=${NAMESPACE:-wordpress}
-          RELEASE_NAME=${RELEASE_NAME:-wordpress}
-          CHART_PATH=${CHART_PATH:-./helm/wordpress}
-          TIMEOUT=${TIMEOUT:-10m}
-
-          echo "Creating namespace if needed: ${NAMESPACE}"
-          kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
-
-          echo "Deploying Helm release '${RELEASE_NAME}'"
-          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
-            --namespace "${NAMESPACE}" \
-            --create-namespace \
-            --wait \
-            --timeout "${TIMEOUT}"
-
-          echo "Objects in namespace: ${NAMESPACE}"
-          kubectl get all -n "${NAMESPACE}"
-          kubectl get svc -n "${NAMESPACE}"
-
+          echo "Deploying Helm"
+          helm upgrade --install wordpress ./helm/wordpress \
+            --namespace wordpress \
+            --create-namespace
